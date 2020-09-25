@@ -48,16 +48,16 @@ int main(int argc, char *argv[])
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(port);
     
-	if( bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr))!=0 ){ //ÅĞ¶Ïbind°ó¶¨ÊÇ·ñ³É¹¦
-        printf("bind failed \n");
-        return -1;
-    }
-	if( listen(listenfd,20)!=0 ){ //¿ªÊ¼¼àÌıÌ×½Ó×Ö£¬ÒÑÁ¬½Ó¶ÓÁĞÉèÖÃÎª×î´ó20
-        printf("listen failed \n");
-        return -1;
-    }
+	if( bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr))!=0 ){ //åˆ¤æ–­bindç»‘å®šæ˜¯å¦æˆåŠŸ
+		printf("bind failed \n");
+		return -1;
+        }
+	if( listen(listenfd,20)!=0 ){ //å¼€å§‹ç›‘å¬å¥—æ¥å­—ï¼Œå·²è¿æ¥é˜Ÿåˆ—è®¾ç½®ä¸ºæœ€å¤§20
+		printf("listen failed \n");
+		return -1;
+        }
 	
-	epfd=epoll_create(65535); //´´½¨Ò»¸öepoll ÉèÖÃepollµÄ×î´óÃèÊö·ûÊıÁ¿ÊÇ65535
+	epfd=epoll_create(65535); //åˆ›å»ºä¸€ä¸ªepoll è®¾ç½®epollçš„æœ€å¤§æè¿°ç¬¦æ•°é‡æ˜¯65535
 	
 	key_t key = ftok(".",0);
 	msgid = msgget(key,IPC_CREAT|0666);
@@ -67,27 +67,26 @@ int main(int argc, char *argv[])
 	pthread_detach(tid[0]); 
   	pthread_create(&tid[1],NULL,sendThread,NULL);
 	pthread_detach(tid[1]);  
-    pthread_create(&tid[2],NULL,client_service,NULL);
+    	pthread_create(&tid[2],NULL,client_service,NULL);
 	pthread_detach(tid[2]);
 	 
 	printf("Listen %d\nAccepting connections ...\n",port);
 
 	while(1){
-			//½ÓÊÕ¿Í»§¶ËÇëÇó
+			//æ¥æ”¶å®¢æˆ·ç«¯è¯·æ±‚
 			struct sockaddr_in clnt_addr;
 			socklen_t clnt_addr_size = sizeof(clnt_addr);
 			int clnt_sock = accept(listenfd, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
-		if(clnt_sock>0){ //ÓĞ¿Í»§¶ËÁ¬½Ó½øÀ´
+		if(clnt_sock>0){ //æœ‰å®¢æˆ·ç«¯è¿æ¥è¿›æ¥
 			WebSocketState *state = (WebSocketState*)malloc(sizeof(WebSocketState));
 			memset(state,0,sizeof(state));
 			state->fd = clnt_sock;
 			state->connect=0;
 			ep_event.data.ptr = state;
-            ep_event.events=EPOLLIN|EPOLLET;
-            epoll_ctl(epfd,EPOLL_CTL_ADD,clnt_sock,&ep_event);
-			
-            printf("client %s:%hu link\n",inet_ntoa(clnt_addr.sin_addr),clnt_addr.sin_port);
-        }
+			ep_event.events=EPOLLIN|EPOLLET;
+			epoll_ctl(epfd,EPOLL_CTL_ADD,clnt_sock,&ep_event);
+			printf("client %s:%hu link\n",inet_ntoa(clnt_addr.sin_addr),clnt_addr.sin_port);
+       		 }
 			
 	
 	}
@@ -96,33 +95,32 @@ int main(int argc, char *argv[])
 
 
 
-//¸ºÔğ¼àÌı¿Í»§¶ËµÄ¶ÁÊÂ¼ş
+//è´Ÿè´£ç›‘å¬å®¢æˆ·ç«¯çš„è¯»äº‹ä»¶
 void* client_service(void *arg){
-	 char recvbuf[1024];
-	 struct epoll_event ep_events[1024];
-	 while(1){
+	char recvbuf[1024];
+	struct epoll_event ep_events[1024];
+	while(1){
         int nfds = epoll_wait(epfd,ep_events,1024,-1);
-       // if(nfds<=0) continue; //Ä¿Ç°Ã»ÓĞÒÑ¾­¾ÍĞ÷µÄÃèÊö·û ¼ÌĞøÏÂÒ»´ÎµÈ´ı
-        for(int i=0;i<nfds;i++){ //±éÀú¾ÍĞ÷µÄÃèÊö·û
-			//ÅĞ¶ÏÊÇ·ñÒÑ¾­½¨Á¢ÁËÁ¬½Ó
+        for(int i=0;i<nfds;i++){ //éå†å°±ç»ªçš„æè¿°ç¬¦
+			//åˆ¤æ–­æ˜¯å¦å·²ç»å»ºç«‹äº†è¿æ¥
 			WebSocketState *state = ep_events[i].data.ptr;
 		 	if(state->connect==0){
 				printf("send shakehand\n");
-				//Î´½¨Á¢Á¬½Ó
-				int n=recv(state->fd,recvbuf,1024,0);//¶ÁÈ¡¸ÃÃèÊö·ûµÄÊı¾İ
+				//æœªå»ºç«‹è¿æ¥
+				int n=recv(state->fd,recvbuf,1024,0);//è¯»å–è¯¥æè¿°ç¬¦çš„æ•°æ®
 				if( n <= 0 ){
-					close(state->fd); //¹Ø±Õ¸ÃÃèÊö·û
+					close(state->fd); //å…³é—­è¯¥æè¿°ç¬¦
 					free(state);
 					continue;
 				}
 				char *secWebSocketKey;
-				secWebSocketKey=computeAcceptKey(recvbuf);	 //¼ÆËã×îÖÕµÄÎÕÊÖÖµ
+				secWebSocketKey=computeAcceptKey(recvbuf);	 //è®¡ç®—æœ€ç»ˆçš„æ¡æ‰‹å€¼
 				if(secWebSocketKey==NULL){
 					close(state->fd);
 					free(state);
 					continue;
 				}
-				shakeHand(state->fd,secWebSocketKey);   //·¢ËÍÎÕÊÖ°ü
+				shakeHand(state->fd,secWebSocketKey);   //å‘é€æ¡æ‰‹åŒ…
 				free(secWebSocketKey);
 				state->connect=1;
 				
@@ -147,32 +145,32 @@ char * fetchSecKey(const char * buf)
   char *flag="Sec-WebSocket-Key: ";
   int i=0, bufLen=0;
 
-  key=(char *)malloc(WEB_SOCKET_KEY_LEN_MAX);//·ÖÅäÎÕÊÖKEY
+  key=(char *)malloc(WEB_SOCKET_KEY_LEN_MAX);//åˆ†é…æ¡æ‰‹KEY
   memset(key,0, WEB_SOCKET_KEY_LEN_MAX);
   
   if(!buf){
       return NULL;
     }
  
-  keyBegin=strstr(buf,flag); //È¡µÃÎÕÊÖÊı¾İËùÔÚÎ»ÖÃ
+  keyBegin=strstr(buf,flag); //å–å¾—æ¡æ‰‹æ•°æ®æ‰€åœ¨ä½ç½®
   if(!keyBegin){
       return NULL;
     }
 	
-  keyBegin+=strlen(flag); //ÒÆ¶¯Ö¸Õëµ½ÎÕÊÖÊı¾İ
+  keyBegin+=strlen(flag); //ç§»åŠ¨æŒ‡é’ˆåˆ°æ¡æ‰‹æ•°æ®
 
-  bufLen=strlen(buf); //Õû¸öÎÕÊÖ°üµÄ³¤¶È
+  bufLen=strlen(buf); //æ•´ä¸ªæ¡æ‰‹åŒ…çš„é•¿åº¦
   
-  for(i=0;i<bufLen;i++){ //±éÀú²»¿É³¬³ö¸Ã³¤¶È
-      if(keyBegin[i]==0x0A||keyBegin[i]==0x0D)break; //»»ĞĞ·ûÍË³ö
+  for(i=0;i<bufLen;i++){ //éå†ä¸å¯è¶…å‡ºè¯¥é•¿åº¦
+      if(keyBegin[i]==0x0A||keyBegin[i]==0x0D)break; //æ¢è¡Œç¬¦é€€å‡º
 
-      key[i]=keyBegin[i]; //È¡µÃkey
+      key[i]=keyBegin[i]; //å–å¾—key
   }
   
   return key;
 }
 
-char * computeAcceptKey(const char * buf) //¼ÆËãÎÕÊÖÖµ
+char * computeAcceptKey(const char * buf) //è®¡ç®—æ¡æ‰‹å€¼
 {
   char * clientKey;
   char * serverKey; 
@@ -180,26 +178,26 @@ char * computeAcceptKey(const char * buf) //¼ÆËãÎÕÊÖÖµ
   char * sha1Data;
   short temp;
   int i,n;
-  const char * GUID="258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //±ê×¼GUID
+  const char * GUID="258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //æ ‡å‡†GUID
  
 
   if(!buf){
       return NULL;
     }
-  clientKey=(char *)malloc(LINE_MAX); //ÎÕÊÖ³¤¶È
+  clientKey=(char *)malloc(LINE_MAX); //æ¡æ‰‹é•¿åº¦
   memset(clientKey,0,LINE_MAX);
   
-  clientKey=fetchSecKey(buf); //ÄÃ³öÎÕÊÖµÄKEY 
+  clientKey=fetchSecKey(buf); //æ‹¿å‡ºæ¡æ‰‹çš„KEY 
  
-  if(!clientKey) //ÄÃ²»µ½ÎÕÊÖKEY
+  if(!clientKey) //æ‹¿ä¸åˆ°æ¡æ‰‹KEY
       return NULL;
 
 
  
-  strcat(clientKey,GUID);//½«¿Í»§¶ËµÄKEYºÍÎÒµÄGUID½øĞĞºÏ²¢
+  strcat(clientKey,GUID);//å°†å®¢æˆ·ç«¯çš„KEYå’Œæˆ‘çš„GUIDè¿›è¡Œåˆå¹¶
 
-  sha1DataTemp=sha1_hash(clientKey); //½øĞĞsha1ÕªÒª
-  n=strlen(sha1DataTemp);  //»ñµÃÕªÒª³¤¶È ÊÇ16½øÖÆµÄ×Ö·û´®
+  sha1DataTemp=sha1_hash(clientKey); //è¿›è¡Œsha1æ‘˜è¦
+  n=strlen(sha1DataTemp);  //è·å¾—æ‘˜è¦é•¿åº¦ æ˜¯16è¿›åˆ¶çš„å­—ç¬¦ä¸²
 
 
   sha1Data=(char *)malloc(n/2+1);  
@@ -209,7 +207,7 @@ char * computeAcceptKey(const char * buf) //¼ÆËãÎÕÊÖÖµ
       sha1Data[i/2]=hex2dec(sha1DataTemp,i,2);    
   } 
 
-  serverKey = base64_encode(sha1Data, strlen(sha1Data)); //base64±àÂë
+  serverKey = base64_encode(sha1Data, strlen(sha1Data)); //base64ç¼–ç 
 
   return serverKey;
 }
@@ -238,11 +236,11 @@ void shakeHand(int connfd,const char *serverKey)
 
 int recvFrame(WebSocketState* state){
 	
-	char WebSocketHead[2]; //ÏÈ¶ÁÈ¡»ù´¡µÄ2×Ö½Ú
+	char WebSocketHead[2]; //å…ˆè¯»å–åŸºç¡€çš„2å­—èŠ‚
 	char opcode,RCV,FIN,MASK,l;
 	char mask[4];
-	//¶ÁÈ¡Êı¾İÍ·²¿
-	int n=recv(state->fd,WebSocketHead,2,0);//¶ÁÈ¡¸ÃÃèÊö·ûµÄÊı¾İ
+	//è¯»å–æ•°æ®å¤´éƒ¨
+	int n=recv(state->fd,WebSocketHead,2,0);//è¯»å–è¯¥æè¿°ç¬¦çš„æ•°æ®
 	if(n<2){ 
 		return -1;
 	}
@@ -256,7 +254,7 @@ int recvFrame(WebSocketState* state){
 	unsigned long long length=0;
 	switch(l){
 		case 126:
-			n = recv(state->fd,&length,2,0);//¶ÁÈ¡¸ÃÃèÊö·ûµÄÊı¾İ
+			n = recv(state->fd,&length,2,0);//è¯»å–è¯¥æè¿°ç¬¦çš„æ•°æ®
 			if(n!=2){
 				#ifdef DEBUG
 					printf("length read error\n");
@@ -265,7 +263,7 @@ int recvFrame(WebSocketState* state){
 			}
 			break;
 		case 127:
-			n = recv(state->fd,&length,8,0);//¶ÁÈ¡¸ÃÃèÊö·ûµÄÊı¾İ
+			n = recv(state->fd,&length,8,0);//è¯»å–è¯¥æè¿°ç¬¦çš„æ•°æ®
 			if(n!=8){
 				#ifdef DEBUG
 					printf("length read error\n");
@@ -286,16 +284,16 @@ int recvFrame(WebSocketState* state){
 			return -1;
 		}
 	}
-	//³¤¶È½âÎöÍê±Ï
+	//é•¿åº¦è§£æå®Œæ¯•
 	char *data = (char *)malloc(sizeof(char)*length);
 	memset(data,0,sizeof(char)*length);
 	if(data == NULL){
 		return -1;
 	}
-	//¶ÁÈ¡Ò»Ö¡Êı¾İ
+	//è¯»å–ä¸€å¸§æ•°æ®
 	unsigned long long read=0;
 	while(read!=l){
-		n=recv(state->fd,data,length,0);//¶ÁÈ¡¸ÃÃèÊö·ûµÄÊı¾İ
+		n=recv(state->fd,data,length,0);//è¯»å–è¯¥æè¿°ç¬¦çš„æ•°æ®
 		if(n<=0){
 			#ifdef DEBUG
 					printf("data read error\n");
@@ -313,15 +311,15 @@ int recvFrame(WebSocketState* state){
 		
 	}
 	WebSocketData* tail=state->WebSocket_recv;
-	if(tail==NULL){ //Êı¾İÍ·
-		//ÅĞ¶ÏOPCODEÊÇ·ñ²»Îª0 ÒòÎªÊÇÊı¾İÍ· OPCODE²»¿ÉÄÜÎª0
+	if(tail==NULL){ //æ•°æ®å¤´
+		//åˆ¤æ–­OPCODEæ˜¯å¦ä¸ä¸º0 å› ä¸ºæ˜¯æ•°æ®å¤´ OPCODEä¸å¯èƒ½ä¸º0
 		if(opcode==0)return -1;
 		tail = (WebSocketData*)malloc(sizeof(WebSocketData));
 		state->WebSocket_recv = tail;
 	}else{
-		//Ñ°ÕÒWebSocketDataÁ´±íÖĞµÄ×îºóÒ»¸ö
+		//å¯»æ‰¾WebSocketDataé“¾è¡¨ä¸­çš„æœ€åä¸€ä¸ª
 		while(tail->next)tail=tail->next;
-		if(tail->isall==1){ //ÖØĞÂ¿ªÒ»¸öWebSocketData
+		if(tail->isall==1){ //é‡æ–°å¼€ä¸€ä¸ªWebSocketData
 			if(opcode==0)return -1; 
 			tail->next = malloc(sizeof(WebSocketData));
 			tail=tail->next;
@@ -332,7 +330,7 @@ int recvFrame(WebSocketState* state){
 	memset(tail,0,sizeof(WebSocketData));
 	tail->type = opcode;
 	tail->datalen+=length;
-	//´´½¨frame;
+	//åˆ›å»ºframe;
 	WebSocketFrame * frame = malloc(sizeof(WebSocketFrame));
 	memset(frame,0,sizeof(frame));
 	frame->datalen = length;
@@ -347,13 +345,13 @@ int recvFrame(WebSocketState* state){
 	}else{
 		tail->headframe = frame;
 	}
-	if(FIN){ //´ú±íÏûÏ¢ÒÑ¾­½ÓÊÜÍê±Ï
-		//ÏûÏ¢µÄÂß¼­´¦Àí¹ı³Ì
+	if(FIN){ //ä»£è¡¨æ¶ˆæ¯å·²ç»æ¥å—å®Œæ¯•
+		//æ¶ˆæ¯çš„é€»è¾‘å¤„ç†è¿‡ç¨‹
 
 		char *data = (char *)malloc(sizeof(char)*tail->datalen);
 		memset(data,0,tail->datalen);
 		WebSocketFrame * headframe = tail->headframe;
-		while(headframe){ //½«ËùÓĞÖ¡¶ÁÈ¡µ½Ò»¸öÊı¾İÀï
+		while(headframe){ //å°†æ‰€æœ‰å¸§è¯»å–åˆ°ä¸€ä¸ªæ•°æ®é‡Œ
 			memcpy(data,headframe->data,headframe->datalen);
 			headframe = headframe->next;
 			
@@ -408,9 +406,9 @@ int WebSocketSendMsg(WebSocketState* state,char* buf,int length,int opcode){
 	data->headframe = (WebSocketFrame*)malloc(sizeof(WebSocketFrame));
 	memset(data->headframe,0,sizeof(WebSocketFrame));
 	WebSocketFrame* frametail = data->headframe;
-	frametail->opcode = opcode; //Ê×Ö¡ÒªÖ¸Ã÷Êı¾İÀàĞÍ
+	frametail->opcode = opcode; //é¦–å¸§è¦æŒ‡æ˜æ•°æ®ç±»å‹
 	while(framecount){
-		if(framecount==1){//×îºóÒ»Ö¡ÁË
+		if(framecount==1){//æœ€åä¸€å¸§äº†
 			frametail->datalen = length;
 		}else{
 			frametail->datalen=65535;
@@ -433,7 +431,7 @@ int WebSocketSendMsg(WebSocketState* state,char* buf,int length,int opcode){
 		}
 		
 	}
-	state->untreated_Sendframe++; //´ı·¢ËÍÏûÏ¢+1
+	state->untreated_Sendframe++; //å¾…å‘é€æ¶ˆæ¯+1
 
 	struct mymesg msg;
 	msg.mtype=2;
@@ -467,16 +465,16 @@ void cleanWebSocketData(WebSocketData* data){
 	free(data);
 }
 
-void* recvThread(void* arg){ //´¦Àí½ÓÊÜÏûÏ¢Ïß³Ì
+void* recvThread(void* arg){ //å¤„ç†æ¥å—æ¶ˆæ¯çº¿ç¨‹
 	struct mymesg msg;
 	while(1){
-		msgrcv(msgid,&msg,sizeof(WebSocketState*),1,0); //ÏûÏ¢ÀàĞÍÎª1µÄ²ÅÊÇ½ÓÊÜÏûÏ¢
+		msgrcv(msgid,&msg,sizeof(WebSocketState*),1,0); //æ¶ˆæ¯ç±»å‹ä¸º1çš„æ‰æ˜¯æ¥å—æ¶ˆæ¯
 		WebSocketState* state= msg.state;
 		state->untreated_Msgframe--;
 		int ret = recvFrame(state);
 		
 		if(ret==-1){
-			state->error=1; //±êÖ¾´íÎó
+			state->error=1; //æ ‡å¿—é”™è¯¯
 			if(state->untreated_Msgframe==0&&state->untreated_Sendframe==0){
 				close(state->fd);
 				cleanWebSocket(state);
@@ -486,17 +484,17 @@ void* recvThread(void* arg){ //´¦Àí½ÓÊÜÏûÏ¢Ïß³Ì
 	}
 }
 
-void* sendThread(void* arg){  //´¦Àí·¢ËÍÏûÏ¢Ïß³Ì
+void* sendThread(void* arg){  //å¤„ç†å‘é€æ¶ˆæ¯çº¿ç¨‹
 	struct mymesg msg;
 	while(1){
-		msgrcv(msgid,&msg,sizeof(WebSocketState*),2,0); //ÏûÏ¢ÀàĞÍÎª2µÄ²ÅÊÇ·¢ËÍÏûÏ¢
+		msgrcv(msgid,&msg,sizeof(WebSocketState*),2,0); //æ¶ˆæ¯ç±»å‹ä¸º2çš„æ‰æ˜¯å‘é€æ¶ˆæ¯
 		WebSocketState* state= msg.state;
 		state->untreated_Sendframe--;
-		if(state->error==1 && state->untreated_Sendframe==0&& state->untreated_Msgframe==0 ){//Èç¹û·¢ÉúÁË´íÎó ÇÒÃ»ÓĞ´ı·¢ËÍµÄÊı¾İÁË
+		if(state->error==1 && state->untreated_Sendframe==0&& state->untreated_Msgframe==0 ){//å¦‚æœå‘ç”Ÿäº†é”™è¯¯ ä¸”æ²¡æœ‰å¾…å‘é€çš„æ•°æ®äº†
 				close(state->fd);
 				cleanWebSocket(state);
 		}else{
-			//ÕÒµ½µÚÒ»ÌõĞè·¢ËÍµÄÊı¾İ·¢ËÍ
+			//æ‰¾åˆ°ç¬¬ä¸€æ¡éœ€å‘é€çš„æ•°æ®å‘é€
 			WebSocketData* head=state->WebSocket_send;
 			state->WebSocket_send = head->next;
 			if(head!=NULL){
@@ -505,9 +503,9 @@ void* sendThread(void* arg){  //´¦Àí·¢ËÍÏûÏ¢Ïß³Ì
 				while(frame){
 					ret = sendFrame(state->fd,frame);
 					if(ret==-1){
-						//·¢ÉúÁË´íÎó
+						//å‘ç”Ÿäº†é”™è¯¯
 						state->error=1;
-						if(state->untreated_Sendframe==0&& state->untreated_Msgframe==0 ){//Èç¹û·¢ÉúÁË´íÎó ÇÒÃ»ÓĞ´ı·¢ËÍµÄÊı¾İÁË
+						if(state->untreated_Sendframe==0&& state->untreated_Msgframe==0 ){//å¦‚æœå‘ç”Ÿäº†é”™è¯¯ ä¸”æ²¡æœ‰å¾…å‘é€çš„æ•°æ®äº†
 							close(state->fd);
 							cleanWebSocket(state);
 							break;
@@ -524,12 +522,12 @@ void* sendThread(void* arg){  //´¦Àí·¢ËÍÏûÏ¢Ïß³Ì
 
 
 void WebSocketSysMsg(WebSocketState * state,char* buf,int opcode,int length){
-	if(opcode==8){//¹Ø±Õ°ü
+	if(opcode==8){//å…³é—­åŒ…
 		WebSocketSendMsg(state,buf,length,opcode);
 		close(state->fd);
 		free(state);
 		
-	}else if(opcode==1){ //ÎÄ±¾ÏûÏ¢
+	}else if(opcode==1){ //æ–‡æœ¬æ¶ˆæ¯
 		WebSocketSendMsg(state,buf,length,opcode);
 	}else if(opcode==9){ //ping
 		WebSocketSendMsg(state,buf,length,0xa); //pong
@@ -545,7 +543,7 @@ void WebSocketSysMsg(WebSocketState * state,char* buf,int opcode,int length){
 
 int hex2dec(const char s[],int start,int len) 
 { 
-	int i=0,j; 
+    int i=0,j; 
     int n = 0; 
     i+=start;
     j=0;
